@@ -1,3 +1,8 @@
+# SysLifters OffSec Tools CI/CD Pipeline with Module to build obfuscation with [OffensivePipeline](https://github.com/Aetsu/OffensivePipeline)
+
+## Additional Instructions
+- Must have OffensivePipeline installed and in SYSTEM path. Rip out Defender and block telemetry!
+
 <img align="left" width="80px" height="80px" src="https://avatars.githubusercontent.com/u/106493015?s=400&u=c6bcdab7055f741a137be13c617e9642f38faef6&v=4">
 
 # Syslifters OffSec Tools
