@@ -1,8 +1,7 @@
 # See documentation here: https://github.com/Syslifters/offsec-tools/blob/main/HOWTO.md
-
 stages:
   - cleanup
-  - adalanche
+  - Obfuscation
   - pingcastle
   - sharphound
   - rubeus
@@ -20,23 +19,18 @@ stages:
   - sharpup
   - winpeas
   - crassus
-  - sharpwsus
   - release
-
 variables:
   ROOT_DIR: "repos"
   BIN_DIR: "bin"
-
 .git:push:
   allow_failure: true
   before_script:
     # Clone the repository via HTTPS inside a new directory
     - git clone "https://${GIT_USERNAME}:${GIT_TOKEN}@${CI_SERVER_HOST}${CI_PROJECT_PATH}" "${CI_COMMIT_SHA}"
     - git config --system core.longpaths true
-
     # Go to the new directory
     - cd "${CI_COMMIT_SHA}"
-
     # Clone specified tool repo 
     - |- 
         if($GIT_REPO){
@@ -44,11 +38,9 @@ variables:
           git clone $GIT_REPO
           cd ..
         }
-
   after_script:
     # Go to the new directory
     - cd "${CI_COMMIT_SHA}"
-
     # Delete .git from tool repo
     - |- 
         if($REPO_DIR){
@@ -65,7 +57,6 @@ variables:
     # Set the displayed user with the commits that are about to be made
     - git config --global user.email "${GIT_USER_EMAIL}"
     - git config --global user.name "${GIT_USERNAME}"
-
     # Add all generated files to Git
     - |- 
       git add -A
@@ -78,19 +69,15 @@ variables:
         git commit -m $COMMIT_SHA
       }
     - git push origin "${CI_DEFAULT_BRANCH}" -o ci.skip
-
-
 cleanup:
   stage: cleanup
   extends: .git:push
   script:
-    - Get-ChildItem -Exclude README.md,HOWTO.md,gitlab-ci.yml,Reptor_Schild_Demo.svg,.git| Remove-Item -Recurse -Force
+    - Get-ChildItem -Exclude README.md,HOWTO.md,gitlab-ci.yml,.git | Remove-Item -Recurse -Force
     - mkdir $ROOT_DIR
     - New-Item $ROOT_DIR\.gitkeep
     - mkdir $BIN_DIR
     - New-Item $BIN_DIR\.gitkeep
-
-
 build_certify:
   stage: certify
   variables:
@@ -102,8 +89,14 @@ build_certify:
     - nuget.exe restore $ROOT_DIR\$REPO_DIR\Certify.sln 
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Certify.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Certify\bin\Debug\Certify.exe $BIN_DIR\
-    
-
+build_obfuscation:
+  stage: Obfuscation
+  extends: .git:push
+  script:
+    - offensivePipeline.exe all
+    - mkdir $BIN_DIR\ObfuscatedBinaries
+    - cp -R C:\OffensivePipeline_v2.0.0\output\ $BIN_DIR\ObfuscatedBinaries\
+    - offensivePipeline.exe clean  
 build_mimikatz:
   stage: mimikatz
   variables:
@@ -119,8 +112,6 @@ build_mimikatz:
     - cp -Force .\mimikatz_trunk\x64\mimidrv.sys $BIN_DIR\mimikatz\mimidrv.sys
     - Remove-Item -Recurse -Force .\mimikatz_trunk.zip
     - Remove-Item -Recurse -Force .\mimikatz_trunk
-
-
 build_rubeus:
   stage: rubeus
   variables:
@@ -131,8 +122,6 @@ build_rubeus:
   script:
     - MSBuild.exe $ROOT_DIR\$REPO_DIR\Rubeus.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Rubeus\bin\Debug\Rubeus.exe $BIN_DIR\
-
-
 build_sharphound:
   stage: sharphound
   variables:
@@ -144,8 +133,6 @@ build_sharphound:
     - dotnet restore $ROOT_DIR\$REPO_DIR
     - dotnet build $ROOT_DIR\$REPO_DIR /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\bin\Debug\net462\SharpHound.exe $BIN_DIR\
-
-
 build_pingcastle:
   stage: pingcastle
   variables:
@@ -156,8 +143,6 @@ build_pingcastle:
   script:
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\PingCastle.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\bin\Debug\PingCastle.exe $BIN_DIR\
-
-
 build_powermad:
   stage: powermad
   variables:
@@ -169,8 +154,6 @@ build_powermad:
     - mkdir $BIN_DIR\Powermad
     - cp $ROOT_DIR\$REPO_DIR\Powermad.ps1 $BIN_DIR\Powermad\
     - cp $ROOT_DIR\$REPO_DIR\Invoke-DNSUpdate.ps1 $BIN_DIR\Powermad\
-
-
 build_adrecon:
   stage: adrecon
   variables:
@@ -180,8 +163,6 @@ build_adrecon:
   extends: .git:push
   script:
     - cp $ROOT_DIR\$REPO_DIR\ADRecon.ps1 $BIN_DIR\
-
-
 build_azureadrecon:
   stage: azureadrecon
   variables:
@@ -191,8 +172,6 @@ build_azureadrecon:
   extends: .git:push
   script:
     - cp $ROOT_DIR\$REPO_DIR\AzureADRecon.ps1 $BIN_DIR\
-
-
 build_seatbelt:
   stage: seatbelt
   variables:
@@ -203,22 +182,6 @@ build_seatbelt:
   script:
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Seatbelt.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Seatbelt\bin\Debug\Seatbelt.exe $BIN_DIR\
-
-
-build_snaffler:
-  stage: snaffler
-  variables:
-    GIT_REPO: "https://github.com/SnaffCon/Snaffler.git"
-    MAINTAINER: "SnaffCon"
-    REPO_DIR: "Snaffler"
-  extends: .git:push
-  script:
-    - MSBuild.exe -t:restore $ROOT_DIR\$REPO_DIR\Snaffler.sln
-    - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Snaffler.sln /p:DebugType=None /p:DebugSymbols=false
-    - mkdir $BIN_DIR\Snaffler
-    - cp -Recurse $ROOT_DIR\$REPO_DIR\Snaffler\bin\Debug\ $BIN_DIR\Snaffler\
-
-
 build_lazagne:
   stage: lazagne
   variables:
@@ -232,8 +195,6 @@ build_lazagne:
     - pyinstaller lazagne.spec
     - cd ..\..\..\
     - cp $ROOT_DIR\$REPO_DIR\Windows\dist\lazagne.exe $BIN_DIR\
-
-
 build_stracciatella:
   stage: stracciatella
   variables:
@@ -246,8 +207,6 @@ build_stracciatella:
     - nuget.exe restore $ROOT_DIR\$REPO_DIR\Stracciatella.sln 
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Stracciatella.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Stracciatella\bin\Debug\Stracciatella.exe $BIN_DIR\
-
-
 build_inveigh:
   stage: inveigh
   variables:
@@ -259,9 +218,7 @@ build_inveigh:
     - dotnet restore $ROOT_DIR\$REPO_DIR
     - dotnet build $ROOT_DIR\$REPO_DIR /p:DebugType=None /p:DebugSymbols=false
     - mkdir $BIN_DIR\Inveigh
-    - cp -Recurse $ROOT_DIR\$REPO_DIR\Inveigh\bin\Debug\net7.0\ $BIN_DIR\Inveigh\
-
-
+    - cp -Recurse $ROOT_DIR\$REPO_DIR\Inveigh\bin\Debug\ $BIN_DIR\Inveigh\
 build_sharpup:
   stage: sharpup
   variables:
@@ -270,10 +227,9 @@ build_sharpup:
     REPO_DIR: "SharpUp"
   extends: .git:push
   script:
+    - nuget.exe restore $ROOT_DIR\$REPO_DIR\SharpUp.sln
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\SharpUp.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\SharpUp\bin\Debug\SharpUp.exe $BIN_DIR\
-
-
 build_winpeas:
   stage: winpeas
   variables:
@@ -285,8 +241,6 @@ build_winpeas:
     - nuget.exe restore $ROOT_DIR\$REPO_DIR\winPEAS\winPEASexe\winPEAS.sln 
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\winPEAS\winPEASexe\winPEAS.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\winPEAS\winPEASexe\winPEAS\bin\Debug\winPEAS.exe $BIN_DIR\
-
-
 build_crassus:
   stage: crassus
   variables:
@@ -298,8 +252,19 @@ build_crassus:
     - rm -force -recurse $ROOT_DIR\$REPO_DIR\binaries
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Crassus.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Crassus\bin\Debug\Crassus.exe $BIN_DIR\
-
-
+build_snaffler:
+  stage: snaffler
+  variables:
+    GIT_REPO: "https://github.com/SnaffCon/Snaffler.git"
+    MAINTAINER: "SnaffCon"
+    REPO_DIR: "Snaffler"
+  extends: .git:push
+  script:
+    - nuget.exe restore $ROOT_DIR\$REPO_DIR\Snaffler.sln
+    - MSBuild.exe -t:restore $ROOT_DIR\$REPO_DIR\Snaffler.sln
+    - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Snaffler.sln /p:DebugType=None /p:DebugSymbols=false
+    - mkdir $BIN_DIR\Snaffler
+    - cp -Recurse $ROOT_DIR\$REPO_DIR\Snaffler\bin\Debug\ $BIN_DIR\Snaffler\
 build_certipy:
   stage: certipy
   variables:
@@ -308,38 +273,10 @@ build_certipy:
     REPO_DIR: "Certipy"
   extends: .git:push
   script:
-    - pyinstaller --onefile --distpath $ROOT_DIR\$REPO_DIR\dist --workpath $ROOT_DIR\$REPO_DIR\build --specpath $ROOT_DIR\$REPO_DIR\ $ROOT_DIR\$REPO_DIR\certipy\entry.py -n Certipy.exe
-    - cp $ROOT_DIR\$REPO_DIR\dist\Certipy.exe $BIN_DIR\
-
-
-build_sharpwsus:
-  stage: sharpwsus
-  variables:
-    GIT_REPO: "https://github.com/nettitude/SharpWSUS"
-    MAINTAINER: "nettitude"
-    REPO_DIR: "SharpWSUS"
-  extends: .git:push
-  script:
-    - dotnet restore $ROOT_DIR\$REPO_DIR
-    - dotnet build $ROOT_DIR\$REPO_DIR /p:DebugType=None /p:DebugSymbols=false
-    - cp $ROOT_DIR\$REPO_DIR\SharpWSUS\bin\Debug\SharpWSUS.exe $BIN_DIR\
-
-
-build_adalanche:
-  stage: adalanche
-  variables:
-    GIT_REPO: "https://github.com/lkarlslund/Adalanche"
-    MAINTAINER: "lkarlslund"
-    REPO_DIR: "Adalanche"
-  extends: .git:push
-  script:
-    - cd $ROOT_DIR\$REPO_DIR\
-    - .\build.ps1
-    - cd ..\..\
-    - mkdir $BIN_DIR\Adalanche
-    - cp -Recurse $ROOT_DIR\$REPO_DIR\binaries $BIN_DIR\Adalanche\
-
-
+    - pyinstaller $ROOT_DIR\$REPO_DIR\Certipy.spec
+    - cp dist\Certipy.exe $BIN_DIR\
+    - rm -Force -Recurse dist
+    - rm -Force -Recurse build
 create_release:
   stage: release
   script:
@@ -356,4 +293,3 @@ create_release:
       $LATEST_TAG = "REL-" + $VERSION
       gh release create --latest $LATEST_TAG
       gh release upload $LATEST_TAG "${BIN_DIR}.zip" --clobber
-      
