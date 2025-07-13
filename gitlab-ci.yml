@@ -2,6 +2,7 @@
 
 stages:
   - cleanup
+  - Obfuscation
   - pingcastle
   - sharphound
   - rubeus
@@ -22,6 +23,9 @@ stages:
   - sharpwsus
   - adalanche
   - whisker
+  - sccmhound
+  - sharpsccm
+  - threatcheck
   - release
 
 variables:
@@ -32,8 +36,9 @@ variables:
   allow_failure: true
   before_script:
     # Clone the repository via HTTPS inside a new directory
-    - git clone "https://${GIT_USERNAME}:${GIT_TOKEN}@${CI_SERVER_HOST}${CI_PROJECT_PATH}" "${CI_COMMIT_SHA}"
     - git config --system core.longpaths true
+    - git config --system core.autocrlf false
+    - git clone "https://${GIT_USERNAME}:${GIT_TOKEN}@${CI_SERVER_HOST}${CI_PROJECT_PATH}" "${CI_COMMIT_SHA}"
 
     # Go to the new directory
     - cd "${CI_COMMIT_SHA}"
@@ -85,12 +90,20 @@ cleanup:
   stage: cleanup
   extends: .git:push
   script:
-    - Get-ChildItem -Exclude README.md,HOWTO.md,gitlab-ci.yml,Reptor_Schild_Demo.svg,.git| Remove-Item -Recurse -Force
+    - Get-ChildItem -Exclude README.md,HOWTO.md,gitlab-ci.yml,.git | Remove-Item -Recurse -Force
     - mkdir $ROOT_DIR
     - New-Item $ROOT_DIR\.gitkeep
     - mkdir $BIN_DIR
     - New-Item $BIN_DIR\.gitkeep
 
+build_obfuscation:
+  stage: Obfuscation
+  extends: .git:push
+  script:
+    - offensivePipeline.exe all
+    - mkdir $BIN_DIR\ObfuscatedBinaries
+    - cp -R C:\OffensivePipeline_v2.0.0\output\ $BIN_DIR\ObfuscatedBinaries\
+    - offensivePipeline.exe clean  
 
 build_certify:
   stage: certify
@@ -103,7 +116,6 @@ build_certify:
     - nuget.exe restore $ROOT_DIR\$REPO_DIR\Certify.sln 
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Certify.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Certify\bin\Debug\Certify.exe $BIN_DIR\
-    
 
 build_mimikatz:
   stage: mimikatz
@@ -121,7 +133,6 @@ build_mimikatz:
     - Remove-Item -Recurse -Force .\mimikatz_trunk.zip
     - Remove-Item -Recurse -Force .\mimikatz_trunk
 
-
 build_rubeus:
   stage: rubeus
   variables:
@@ -133,7 +144,6 @@ build_rubeus:
     - MSBuild.exe $ROOT_DIR\$REPO_DIR\Rubeus.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Rubeus\bin\Debug\Rubeus.exe $BIN_DIR\
 
-
 build_sharphound:
   stage: sharphound
   variables:
@@ -144,8 +154,7 @@ build_sharphound:
   script:
     - dotnet restore $ROOT_DIR\$REPO_DIR
     - dotnet build $ROOT_DIR\$REPO_DIR /p:DebugType=None /p:DebugSymbols=false
-    - cp $ROOT_DIR\$REPO_DIR\bin\Debug\net462\SharpHound.exe $BIN_DIR\
-
+    - cp $ROOT_DIR\$REPO_DIR\bin\Debug\net472\SharpHound.exe $BIN_DIR\
 
 build_pingcastle:
   stage: pingcastle
@@ -155,9 +164,9 @@ build_pingcastle:
     REPO_DIR: "pingcastle"
   extends: .git:push
   script:
-    - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\PingCastle.sln /p:DebugType=None /p:DebugSymbols=false
-    - cp $ROOT_DIR\$REPO_DIR\bin\Debug\PingCastle.exe $BIN_DIR\
-
+    - nuget.exe restore $ROOT_DIR\$REPO_DIR\PingCastle.sln -NonInteractive
+    - MSBuild.exe -t:build "$ROOT_DIR\$REPO_DIR\PingCastle.sln" /p:Configuration=Release /p:DebugType=None /p:DebugSymbols=false /m; if ($LASTEXITCODE) { exit $LASTEXITCODE }
+    - cp $ROOT_DIR\$REPO_DIR\bin\Release\PingCastle.exe $BIN_DIR\
 
 build_powermad:
   stage: powermad
@@ -171,7 +180,6 @@ build_powermad:
     - cp $ROOT_DIR\$REPO_DIR\Powermad.ps1 $BIN_DIR\Powermad\
     - cp $ROOT_DIR\$REPO_DIR\Invoke-DNSUpdate.ps1 $BIN_DIR\Powermad\
 
-
 build_adrecon:
   stage: adrecon
   variables:
@@ -181,7 +189,6 @@ build_adrecon:
   extends: .git:push
   script:
     - cp $ROOT_DIR\$REPO_DIR\ADRecon.ps1 $BIN_DIR\
-
 
 build_azureadrecon:
   stage: azureadrecon
@@ -193,7 +200,6 @@ build_azureadrecon:
   script:
     - cp $ROOT_DIR\$REPO_DIR\AzureADRecon.ps1 $BIN_DIR\
 
-
 build_seatbelt:
   stage: seatbelt
   variables:
@@ -204,21 +210,6 @@ build_seatbelt:
   script:
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Seatbelt.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Seatbelt\bin\Debug\Seatbelt.exe $BIN_DIR\
-
-
-build_snaffler:
-  stage: snaffler
-  variables:
-    GIT_REPO: "https://github.com/SnaffCon/Snaffler.git"
-    MAINTAINER: "SnaffCon"
-    REPO_DIR: "Snaffler"
-  extends: .git:push
-  script:
-    - MSBuild.exe -t:restore $ROOT_DIR\$REPO_DIR\Snaffler.sln
-    - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Snaffler.sln /p:DebugType=None /p:DebugSymbols=false
-    - mkdir $BIN_DIR\Snaffler
-    - cp -Recurse $ROOT_DIR\$REPO_DIR\Snaffler\bin\Debug\ $BIN_DIR\Snaffler\
-
 
 build_lazagne:
   stage: lazagne
@@ -233,7 +224,6 @@ build_lazagne:
     - cd ..\..\..\
     - cp $ROOT_DIR\$REPO_DIR\Windows\dist\lazagne.exe $BIN_DIR\
 
-
 build_stracciatella:
   stage: stracciatella
   variables:
@@ -246,7 +236,6 @@ build_stracciatella:
     - nuget.exe restore $ROOT_DIR\$REPO_DIR\Stracciatella.sln 
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Stracciatella.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Stracciatella\bin\Debug\Stracciatella.exe $BIN_DIR\
-
 
 build_inveigh:
   stage: inveigh
@@ -261,7 +250,6 @@ build_inveigh:
     - mkdir $BIN_DIR\Inveigh
     - cp -Recurse $ROOT_DIR\$REPO_DIR\Inveigh\bin\Debug\net8.0\ $BIN_DIR\Inveigh\
 
-
 build_sharpup:
   stage: sharpup
   variables:
@@ -270,9 +258,9 @@ build_sharpup:
     REPO_DIR: "SharpUp"
   extends: .git:push
   script:
+    - nuget.exe restore $ROOT_DIR\$REPO_DIR\SharpUp.sln
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\SharpUp.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\SharpUp\bin\Debug\SharpUp.exe $BIN_DIR\
-
 
 build_winpeas:
   stage: winpeas
@@ -286,7 +274,6 @@ build_winpeas:
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\winPEAS\winPEASexe\winPEAS.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\winPEAS\winPEASexe\winPEAS\bin\Debug\winPEAS.exe $BIN_DIR\
 
-
 build_crassus:
   stage: crassus
   variables:
@@ -299,6 +286,18 @@ build_crassus:
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Crassus.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Crassus\bin\Debug\Crassus.exe $BIN_DIR\
 
+build_snaffler:
+  stage: snaffler
+  variables:
+    GIT_REPO: "https://github.com/SnaffCon/Snaffler.git"
+    MAINTAINER: "SnaffCon"
+    REPO_DIR: "Snaffler"
+  extends: .git:push
+  script:
+    - MSBuild.exe -t:restore $ROOT_DIR\$REPO_DIR\Snaffler.sln
+    - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Snaffler.sln /p:DebugType=None /p:DebugSymbols=false
+    - mkdir $BIN_DIR\Snaffler
+    - cp -Recurse $ROOT_DIR\$REPO_DIR\Snaffler\bin\Debug\ $BIN_DIR\Snaffler\
 
 build_certipy:
   stage: certipy
@@ -312,7 +311,6 @@ build_certipy:
     - pyinstaller --onefile --distpath $ROOT_DIR\$REPO_DIR\dist --workpath $ROOT_DIR\$REPO_DIR\build --specpath $ROOT_DIR\$REPO_DIR\ $ROOT_DIR\$REPO_DIR\certipy\entry.py -n Certipy.exe --hidden-import unicrypto.backends.pycryptodomex
     - cp $ROOT_DIR\$REPO_DIR\dist\Certipy.exe $BIN_DIR\
 
-
 build_sharpwsus:
   stage: sharpwsus
   variables:
@@ -324,7 +322,6 @@ build_sharpwsus:
     - dotnet restore $ROOT_DIR\$REPO_DIR
     - dotnet build $ROOT_DIR\$REPO_DIR /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\SharpWSUS\bin\Debug\SharpWSUS.exe $BIN_DIR\
-
 
 build_adalanche:
   stage: adalanche
@@ -340,7 +337,6 @@ build_adalanche:
     - mkdir $BIN_DIR\Adalanche
     - cp -Recurse $ROOT_DIR\$REPO_DIR\binaries $BIN_DIR\Adalanche\
 
-
 build_whisker:
   stage: whisker
   variables:
@@ -352,6 +348,48 @@ build_whisker:
     - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\Whisker.sln /p:DebugType=None /p:DebugSymbols=false
     - cp $ROOT_DIR\$REPO_DIR\Whisker\bin\Debug\Whisker.exe $BIN_DIR\
 
+build_sccmhound:
+  stage: sccmhound
+  variables:
+    GIT_REPO: "https://github.com/CrowdStrike/sccmhound.git"
+    MAINTAINER: "CrowdStrike"
+    REPO_DIR: "sccmhound"
+  extends: .git:push
+  script:
+    # Initialize and update submodules to get SharpHoundCommon
+    - cd $ROOT_DIR\$REPO_DIR
+    - git submodule init
+    - git submodule update
+    - cd ..\..
+    # Restore and build the solution
+    - nuget restore $ROOT_DIR\$REPO_DIR\SCCMHound.sln -NonInteractive
+    - dotnet build $ROOT_DIR\$REPO_DIR\SCCMHound.sln -c Release /p:DebugType=None /p:DebugSymbols=false
+    - cp $ROOT_DIR\$REPO_DIR\bin\Release\SCCMHound.exe $BIN_DIR\
+    - Get-Process dotnet -ErrorAction SilentlyContinue | Stop-Process -Force
+
+build_sharpsccm:
+  stage: sharpsccm
+  variables:
+    GIT_REPO: "https://github.com/Mayyhem/SharpSCCM.git"
+    MAINTAINER: "Mayyhem"
+    REPO_DIR: "SharpSCCM"
+  extends: .git:push
+  script:
+    - nuget.exe restore $ROOT_DIR\$REPO_DIR\SharpSCCM.sln -NonInteractive
+    - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\SharpSCCM.sln /p:Configuration=Release /p:DebugType=None /p:DebugSymbols=false
+    - cp $ROOT_DIR\$REPO_DIR\bin\Release\SharpSCCM.exe $BIN_DIR\
+
+build_threatcheck:
+  stage: threatcheck
+  variables:
+    GIT_REPO: "https://github.com/rasta-mouse/ThreatCheck.git"
+    MAINTAINER: "rasta-mouse"
+    REPO_DIR: "ThreatCheck"
+  extends: .git:push
+  script:
+    - nuget.exe restore $ROOT_DIR\$REPO_DIR\ThreatCheck.sln -NonInteractive
+    - MSBuild.exe -t:build $ROOT_DIR\$REPO_DIR\ThreatCheck.sln /p:Configuration=Release /p:DebugType=None /p:DebugSymbols=false
+    - cp $ROOT_DIR\$REPO_DIR\ThreatCheck\bin\Release\ThreatCheck.exe $BIN_DIR\
 
 create_release:
   stage: release
@@ -369,6 +407,3 @@ create_release:
       $LATEST_TAG = "REL-" + $VERSION
       gh release create --latest $LATEST_TAG
       gh release upload $LATEST_TAG "${BIN_DIR}.zip" --clobber
-      
-
-      
